@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { KeyRound, Sparkles, Loader2, AlertCircle, ExternalLink, Copy, Check, Settings2 } from "lucide-react";
+import { KeyRound, Sparkles, Loader2, AlertCircle, ExternalLink, Copy, Check, Server, ShieldCheck } from "lucide-react";
 
 interface ScrapeResponse {
   title: string;
@@ -15,7 +15,7 @@ interface ScrapeResponse {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
+  const [useCustomKey, setUseCustomKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScrapeResponse | null>(null);
@@ -23,7 +23,10 @@ export default function Home() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("byok_groq_key");
-    if (stored) setApiKey(stored);
+    if (stored) {
+      setApiKey(stored);
+      setUseCustomKey(true);
+    }
   }, []);
 
   const handleKeyUpdate = (val: string) => {
@@ -35,9 +38,25 @@ export default function Home() {
     }
   };
 
+  const handleToggle = (enabled: boolean) => {
+    setUseCustomKey(enabled);
+    setError(null);
+  };
+
   const handleSummarize = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+
+    if (useCustomKey) {
+      if (!apiKey.trim()) {
+        setError("Please provide a valid Groq API key or toggle back to Default Key.");
+        return;
+      }
+      if (!apiKey.trim().startsWith("gsk_")) {
+        setError("Invalid Key Format: BYOK currently only supports Groq API keys (must start with 'gsk_').");
+        return;
+      }
+    }
 
     setLoading(true);
     setError(null);
@@ -49,7 +68,8 @@ export default function Home() {
         "x-ai-provider": "groq",
       };
 
-      if (apiKey.trim()) {
+      // Only forward the BYOK key if custom key toggle is explicitly active
+      if (useCustomKey && apiKey.trim()) {
         headers["x-user-api-key"] = apiKey.trim();
       }
 
@@ -72,7 +92,6 @@ export default function Home() {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      // Initialize an empty result container
       setResult({
         title: "Fetching...",
         summary: "",
@@ -111,7 +130,7 @@ export default function Home() {
               }));
             }
           } catch {
-            // Partial JSON chunk safety guard
+            // Partial JSON safety guard
           }
         }
       }
@@ -131,60 +150,92 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center px-4 py-12">
-      {/* BYOK Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div className="w-full max-w-2xl space-y-6">
+        
+        {/* Header Controls & Toggle Switch */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 border border-slate-800 bg-slate-900/60 p-3 rounded-xl">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-mono text-slate-400">
+              {useCustomKey ? "BYOK Active (Uncapped Rate)" : "Default Engine (10 req/min limit)"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => handleToggle(false)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                !useCustomKey
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Server className="w-3.5 h-3.5" />
+              Default Key
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggle(true)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                useCustomKey
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              Custom BYOK
+            </button>
+          </div>
+        </div>
+
+        {/* Conditional BYOK Key Drawer */}
+        {useCustomKey && (
+          <div className="border border-indigo-900/50 bg-indigo-950/20 rounded-xl p-4 space-y-2.5">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-indigo-400" />
-                BYOK (Bring Your Own Key) Settings
-              </h3>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1"
-              >
-                ✕
-              </button>
+              <label className="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                Custom API Key
+                <span className="ml-1 text-[10px] normal-case tracking-normal px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                  Groq Only
+                </span>
+              </label>
+              {apiKey && (
+                <button
+                  type="button"
+                  onClick={() => handleKeyUpdate("")}
+                  className="text-xs text-rose-400 hover:text-rose-300 hover:underline"
+                >
+                  Clear Key
+                </button>
+              )}
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Enter your Groq API Key. The key is kept strictly in browser <code>localStorage</code> and transmitted via transient request headers directly to the API handler. It is never logged or saved in a database.
-            </p>
+
             <input
               type="password"
               placeholder="gsk_..."
               value={apiKey}
               onChange={(e) => handleKeyUpdate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-600"
             />
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium"
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 leading-relaxed pt-0.5">
+              <span>
+                Currently supports <strong className="text-slate-300 font-semibold">Groq API Keys</strong> (starts with <code className="text-indigo-300 font-mono">gsk_</code>).
+              </span>
+              <a
+                href="https://console.groq.com/keys"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 underline shrink-0 ml-2"
               >
-                Done
-              </button>
+                Get Groq Key ↗
+              </a>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Main View */}
-      <div className="w-full max-w-2xl space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-mono text-slate-400">BYOK Architecture • Groq Llama 3.3</span>
-          </div>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300"
-          >
-            <Settings2 className="w-3.5 h-3.5 text-indigo-400" />
-            {apiKey ? "Key Loaded" : "Set API Key (BYOK)"}
-          </button>
-        </div>
-
+        {/* Main Heading */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
             AI Web Content Summarizer
@@ -233,10 +284,11 @@ export default function Home() {
               <p className="text-rose-300/80">{error}</p>
               {error.includes("GROQ_API_KEY_MISSING") && (
                 <button
-                  onClick={() => setShowSettings(true)}
+                  type="button"
+                  onClick={() => setUseCustomKey(true)}
                   className="underline text-indigo-300 hover:text-indigo-200 mt-1 inline-block"
                 >
-                  Click here to set your Groq Key
+                  Switch to Custom BYOK and enter your Groq Key
                 </button>
               )}
             </div>
@@ -245,32 +297,35 @@ export default function Home() {
 
         {result && (
           <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
-            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
-              <div>
-                <span>Processed {result.characterCount.toLocaleString()} chars</span>
-                <span className="text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Active Engine: {result.modelUsed || "Groq"}
-                </span>
+            <div className="flex justify-between items-start border-b border-slate-800 pb-3 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <span>Processed {result.characterCount.toLocaleString()} chars</span>
+                  <span className="text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                    Active Engine: {result.modelUsed || "Groq"}
+                  </span>
+                </div>
                 <h2 className="text-base font-semibold text-white">{result.title}</h2>
                 <a
                   href={result.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-slate-500 hover:text-slate-300 inline-flex items-center gap-1 mt-0.5"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 mt-0.5 truncate max-w-[280px] sm:max-w-md"
                 >
-                  {result.url} <ExternalLink className="w-3 h-3" />
+                  {result.url} <ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               </div>
               <button
+                type="button"
                 onClick={copyToClipboard}
-                className="px-2.5 py-1 rounded-md border border-slate-700 bg-slate-800 text-xs text-slate-300 flex items-center gap-1.5"
+                className="px-2.5 py-1 rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 flex items-center gap-1.5 shrink-0 transition"
               >
                 {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 {copied ? "Copied" : "Copy"}
               </button>
             </div>
             <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-line">
-              {result.summary}
+              {result.summary || "Generating summary tokens..."}
             </div>
           </div>
         )}

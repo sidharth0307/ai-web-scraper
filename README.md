@@ -250,17 +250,5 @@ Expected Output: **HTTP 502 Bad Gateway** returning a user-friendly alert rather
   * **Pros:** Eliminates client-facing outages caused by rate-limiting (HTTP 429), dynamic model deprecations, or regional capacity blackouts; transitions downstream execution automatically.
   * **Cons:** If the initial model fails mid-stream, the stream must cleanly abort and restart generation on the secondary model, consuming compute time.
 
----
 
-## Production Deployment
-
-### Deploying to Vercel
-1. Push your repository to GitHub.
-2. Log in to Vercel and click **Add New...** → **Project**.
-3. Import your `ai-web-scraper` repository.
-4. Under **Environment Variables**, configure:
-   * **`GROQ_API_KEY`**: *(Optional server-level fallback key)*
-5. Click **Deploy**.
-
-Vercel automatically provisions the Next.js App Router endpoints as serverless functions, preserving streaming capabilities and executing security guards globally at the network edge.
 
